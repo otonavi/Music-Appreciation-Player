@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Appreciation Player</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g transform='translate(22,75) scale(0.8) rotate(-10)' fill='%23ff3366'><ellipse cx='0' cy='0' rx='14' ry='10' transform='rotate(-15)'/><rect x='6' y='-45' width='6' height='45'/><path d='M 12 -45 Q 35 -40 20 -15 Q 26 -30 12 -33 Z'/></g><g transform='translate(52,45) scale(0.95) rotate(15)' fill='%23ffd700'><ellipse cx='0' cy='0' rx='14' ry='10' transform='rotate(-15)'/><rect x='6' y='-45' width='6' height='45'/><path d='M 12 -45 Q 35 -40 20 -15 Q 26 -30 12 -33 Z'/></g><g transform='translate(82,80) scale(0.75) rotate(-5)' fill='%2300c3ff'><ellipse cx='0' cy='0' rx='14' ry='10' transform='rotate(-15)'/><rect x='6' y='-45' width='6' height='45'/><path d='M 12 -45 Q 35 -40 20 -15 Q 26 -30 12 -33 Z'/></g></svg>">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.577.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --ink:        #183153;
+      --muted:      #61708a;
+      --paper:      #fffdf6;
+      --line:       #dce4ed;
+      --yellow:     #ffd51c;   /* タイムバー進捗色 */
+      --egg:        #fef6d8;   /* 音声ファイルボタン：卵色 */
+      --orange-lt:  #fce4ec;   /* タイム設定ボタン：淡いピンク */
+      --green:      #e2f7b5;
+      --blue:       #4f8ff5;
+      --aqua:       #b1e8f5;
+      --red:        #ee5c45;
+    }
+
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "M PLUS Rounded 1c", "DM Sans", sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      overflow-x: hidden;
+    }
+
+    /* ── Page wrapper ── */
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: clamp(16px, 3vw, 44px) clamp(12px, 4vw, 56px);
+      background:
+        radial-gradient(circle at 8% 10%,  rgba(255,213,28,.22)  0 76px,  transparent 78px),
+        radial-gradient(circle at 93% 90%, rgba(82,198,223,.18)  0 112px, transparent 114px),
+        #fffdf6;
+    }
+
+    /* ── Card ── */
+    .card {
+      width: min(1110px, 100%);
+      background: #fff;
+      border-radius: 30px;
+      padding: clamp(24px, 4.2vw, 58px);
+      border: 1px solid rgba(24,49,83,.08);
+      box-shadow: 0 22px 64px rgba(42,67,100,.13);
+      animation: rise .5s ease both;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand h1 {
+      font-size: clamp(1rem, 2vw, 1.4rem);
+      font-weight: 800;
+      letter-spacing: -.02em;
+      line-height: 1.2;
+    }
+
+    .song-meta { text-align: right; }
+
+    #song-title-disp {
+      font-size: clamp(.95rem, 1.8vw, 1.22rem);
+      font-weight: 700;
+    }
+
+    #song-composer-disp {
+      font-size: .87rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* ── Time display ── */
+    .time-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 28px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cur-time {
+      font-size: clamp(2.8rem, 7vw, 4.8rem);
+      font-weight: 800;
+      letter-spacing: -.04em;
+      line-height: 1;
+    }
+
+    .time-sep {
+      font-size: clamp(1.5rem, 3.5vw, 2.6rem);
+      color: var(--muted);
+      transform: rotate(-12deg);
+      display: inline-block;
+    }
+
+    #tot-time {
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: -.03em;
+      line-height: 1;
+    }
+
+    /* ── Timeline shell ── */
+    .tl-label {
+      font-size: .74rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    #main-tl {
+      position: relative;
+      width: 100%;
+      height: clamp(68px, 9vw, 94px);
+      border-radius: 18px;
+      background: #d9e3ef;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: visible;
+    }
+
+    #main-tl:focus-visible {
+      outline: 4px solid rgba(79,143,245,.45);
+      outline-offset: 4px;
+    }
+
+    /* Clipped layers */
+    .tl-clip {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    /* Section colour bands */
+    .sec-band {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      align-items: flex-start;
+      padding: 8px 10px;
+      overflow: hidden;
+      opacity: .68;
+    }
+
+    .sec-band-lbl {
+      font-size: clamp(.68rem, 1.3vw, .88rem);
+      font-weight: 800;
+      color: rgba(24,49,83,.82);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    /* Progress overlay */
+    #prog-ov {
+      position: absolute;
+      top: 0; bottom: 0; left: 0;
+      width: 0%;
+      background: var(--yellow);
+      border-radius: 18px 0 0 18px;
+      pointer-events: none;
+      transition: width .07s linear;
+      border-right: 2px solid #eab308;
+    }
+
+    /* Playhead */
+    #playhead {
+      position: absolute;
+      top: -8px;
+      bottom: -8px;
+      width: 3px;
+      background: var(--ink);
+      border-radius: 2px;
+      transform: translateX(-50%);
+      pointer-events: none;
+      display: none;
+      z-index: 5;
+    }
+
+    #playhead::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translate(-50%, -4px);
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--ink);
+    }
+
+    /* Marker lines */
+    .marker {
+      position: absolute;
+      top: -11px;
+      bottom: -11px;
+      width: 5px;
+      background: var(--blue);
+      border-radius: 5px;
+      transform: translateX(-50%);
+      cursor: pointer;
+      z-index: 6;
+      box-shadow: 0 2px 6px rgba(79,143,245,.28);
+      transition: background .14s;
+    }
+
+    .marker:hover { background: #3b76d1; }
+
+    /* Always visible label on marker */
+    .mk-lbl-always {
+      position: absolute;
+      bottom: calc(100% + 5px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: .8rem;
+      font-weight: 800;
+      color: #fff;
+      background: var(--blue);
+      padding: 2px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 2px 4px rgba(79,143,245,.3);
+      transition: background .15s, transform .15s;
+    }
+
+    .mk-lbl-always:hover {
+      background: var(--red);
+      transform: translateX(-50%) scale(1.1);
+    }
+
+    /* Hover tooltip for comment */
+    .mk-tip {
+      position: absolute;
+      bottom: calc(100% + 30px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 7px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .15s;
+      z-index: 12;
+    }
+
+    .marker:hover .mk-tip { opacity: 1; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 14px 16px;
+      border: none;
+      border-radius: 18px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: clamp(.88rem, 1.5vw, 1.05rem);
+      cursor: pointer;
+      transition: transform .14s, box-shadow .14s, filter .14s;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .btn:focus-visible { outline: 4px solid rgba(24,49,83,.3); outline-offset: 3px; }
+    .btn:hover:not(:disabled) { filter: brightness(1.05); transform: translateY(-2px); }
+    .btn:active:not(:disabled) { transform: translateY(4px); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; filter: saturate(.35); }
+
+    .btn-primary { min-height: 70px; }
+
+    /* ① 音声ファイルボタン：卵色 */
+    .btn-egg      { background: var(--egg);      color: var(--ink); box-shadow: 0 6px 0 rgba(24,49,83,.12); }
+    /* ② タイム設定ボタン：薄いオレンジ */
+    .btn-orange-lt{ background: var(--orange-lt); color: var(--ink); box-shadow: 0 6px 0 rgba(24,49,83,.12); }
+
+    .btn-yellow  { background: var(--yellow); color: var(--ink); box-shadow: 0 6px 0 rgba(24,49,83,.18); }
+    .btn-green   { background: var(--green);  color: var(--ink); box-shadow: 0 6px 0 rgba(24,49,83,.15); }
+    .btn-aqua    { background: var(--aqua);   color: var(--ink); box-shadow: 0 6px 0 rgba(24,49,83,.15); }
+    .btn-ink     { background: var(--ink);    color: #fff;       box-shadow: 0 6px 0 rgba(24,49,83,.3);  }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 2px solid var(--line);
+      box-shadow: 0 4px 0 var(--line);
+      min-height: 43px;
+      padding: 9px 14px;
+      font-size: .87rem;
+      border-radius: 12px;
+    }
+
+    .btn-ghost:hover:not(:disabled) { border-color: var(--muted); }
+
+    .btn-ghost.is-active {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+      box-shadow: 0 4px 0 rgba(24,49,83,.3);
+    }
+
+    /* ── Controls layout ── */
+    .controls { margin-top: 30px; }
+
+    /* ② ボタン4列に対応 */
+    .btn-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 13px;
+    }
+
+    .inline-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .row-label {
+      font-size: .81rem;
+      font-weight: 700;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ② 手動モードバッジ */
+    #manual-badge {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: var(--orange-lt);
+      color: var(--ink);
+      font-size: .82rem;
+      font-weight: 700;
+      padding: 7px 14px;
+      border-radius: 10px;
+      border: 1.5px solid #fb923c;
+      margin-top: 6px;
+    }
+
+    #manual-badge.show { display: inline-flex; }
+
+    /* Status bar */
+    #status-bar {
+      text-align: center;
+      min-height: 26px;
+      margin-top: 14px;
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    /* ── Edit panel ── */
+    .edit-section { margin-top: 28px; }
+
+    .edit-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: .87rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px 0;
+      transition: color .15s;
+    }
+
+    .edit-toggle-btn:hover { color: var(--ink); }
+
+    .edit-panel {
+      display: none;
+      border: 1.5px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+      margin-top: 13px;
+    }
+
+    .edit-panel.open { display: block; }
+
+    /* Tabs */
+    .edit-tabs {
+      display: flex;
+      border-bottom: 1.5px solid var(--line);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .edit-tabs::-webkit-scrollbar { display: none; }
+
+    .edit-tab {
+      padding: 12px 20px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-family: inherit;
+      font-size: .83rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color .15s, border-color .15s;
+    }
+
+    .edit-tab:hover { color: var(--ink); }
+    .edit-tab.active { color: var(--ink); border-bottom-color: var(--blue); }
+
+    .tab-pane {
+      padding: 22px;
+      display: none;
+    }
+
+    .tab-pane.active { display: block; }
+
+    /* Form elements */
+    .f-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .f-label {
+      font-size: .81rem;
+      font-weight: 700;
+      color: var(--muted);
+      width: 74px;
+      flex-shrink: 0;
+    }
+
+    .f-input {
+      flex: 1;
+      min-width: 100px;
+      padding: 8px 12px;
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: .9rem;
+      color: var(--ink);
+      background: #fff;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .f-input:focus { border-color: var(--blue); }
+
+    /* 分・秒の入力フィールド（小さめ） */
+    .f-input-sm {
+      width: 60px;
+      min-width: unset;
+      flex: none;
+      text-align: center;
+    }
+
+    .now-btn {
+      min-height: 35px;
+      padding: 6px 12px;
+      font-size: .81rem;
+      border-radius: 9px;
+    }
+
+    .save-btn {
+      min-height: 40px;
+      padding: 9px 18px;
+      font-size: .88rem;
+      border-radius: 12px;
+      margin-top: 6px;
+    }
+
+    /* Color chips */
+    .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+
+    .chip {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: transform .12s;
+    }
+
+    .chip:hover { transform: scale(1.15); }
+    .chip.sel   { border-color: var(--ink); }
+
+    /* Item lists */
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 10px 0 4px;
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #f4f7fb;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+
+    .item-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .item-info { flex: 1; min-width: 0; }
+
+    .item-main {
+      font-size: .88rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-sub {
+      font-size: .74rem;
+      color: var(--muted);
+      margin-top: 1px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-acts { display: flex; gap: 5px; flex-shrink: 0; }
+
+    .ico-btn {
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: 1.5px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: color .13s, border-color .13s, background .13s;
+    }
+
+    .ico-btn:hover     { color: var(--ink); border-color: var(--ink); background: #f0f4fa; }
+    .ico-btn.del:hover { color: var(--red); border-color: var(--red); background: #fff3f1; }
+
+    /* Add-item form */
+    .add-form {
+      background: #f4f7fb;
+      border: 1.5px dashed var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 14px;
+    }
+
+    .add-form-ttl {
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .hint { font-size: .8rem; color: var(--muted); line-height: 1.65; margin-bottom: 4px; }
+
+    /* Hidden file input */
+    .file-hidden {
+      position: absolute;
+      width: 1px; height: 1px;
+      opacity: 0; overflow: hidden;
+      clip: rect(0,0,0,0);
+    }
+
+    /* ── Modal ── */
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(24,49,83,.42);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-bg.open { display: flex; }
+
+    .modal-box {
+      background: #fff;
+      border-radius: 22px;
+      padding: 28px;
+      width: min(460px, 100%);
+      box-shadow: 0 32px 84px rgba(24,49,83,.22);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-box h2 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    /* Animation */
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .btn-row    { grid-template-columns: repeat(2, 1fr); }
+      .app-header { flex-direction: column; }
+      .song-meta  { text-align: left; }
+    }
+    @media (max-width: 420px) {
+      .btn-row    { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     PAGE
+     ══════════════════════════════════════════════ -->
+<div class="app">
+<div class="card">
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="app-header">
+    <div class="brand">
+      <i data-lucide="music-2" width="22" height="22" style="color:var(--blue);flex-shrink:0"></i>
+      <h1>Music Appreciation Player</h1>
+    </div>
+    <div class="song-meta">
+      <div id="song-title-disp"    style="display:none"></div>
+      <div id="song-composer-disp" style="display:none"></div>
+    </div>
+  </header>
+
+  <!-- ═══ TIME DISPLAY ═══ -->
+  <div class="time-row" aria-label="再生時間">
+    <output id="cur-time"  aria-live="off">0分00秒</output>
+    <span class="time-sep" aria-hidden="true">/</span>
+    <output id="tot-time">0分00秒</output>
+  </div>
+
+  <!-- ═══ TIMELINE ═══ -->
+  <div>
+    <p class="tl-label">タイムライン</p>
+
+    <div id="main-tl"
+         role="slider" tabindex="0"
+         aria-label="再生位置"
+         aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+
+      <!-- Progress overlay (clipped) -->
+      <div class="tl-clip"><div id="prog-ov"></div></div>
+
+      <!-- Section colour bands (clipped) -->
+      <div class="tl-clip" id="sec-clip"></div>
+
+      <!-- Playhead line -->
+      <div id="playhead"></div>
+
+      <!-- Marker vertical lines -->
+      <div id="mk-wrap"></div>
+    </div>
+
+    <!-- ② 手動モードバッジ -->
+    <div id="manual-badge">
+      <i data-lucide="clock" width="14" height="14"></i>
+      <span id="manual-badge-txt"></span>
+      <button id="manual-reset-btn" type="button" style="margin-left:8px;font-size:.75rem;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;font-weight:700;">✕ リセット</button>
+    </div>
+  </div>
+
+  <!-- ═══ PRIMARY CONTROLS ═══ -->
+  <div class="controls">
+
+    <div class="btn-row">
+      <!-- ① 音声ファイルを開く：卵色 -->
+      <label class="btn btn-egg btn-primary" style="cursor:pointer;position:relative;">
+        <i data-lucide="folder-open" width="26" height="26" aria-hidden="true"></i>
+        <span>音声ファイルを開く</span>
+        <input id="audio-in" type="file" accept="audio/*" class="file-hidden">
+      </label>
+
+      <!-- ② タイムを設定する：薄いオレンジ -->
+      <button id="set-time-btn" class="btn btn-orange-lt btn-primary" type="button">
+        <i data-lucide="clock" width="26" height="26" aria-hidden="true"></i>
+        <span>タイムを設定する</span>
+      </button>
+
+      <!-- Play / Pause -->
+      <button id="play-btn" class="btn btn-green btn-primary" type="button" disabled>
+        <i id="play-ico" data-lucide="play" width="28" height="28" aria-hidden="true"></i>
+        <span id="play-txt">再生</span>
+      </button>
+
+      <!-- Restart -->
+      <button id="restart-btn" class="btn btn-aqua btn-primary" type="button" disabled>
+        <i data-lucide="rotate-ccw" width="24" height="24" aria-hidden="true"></i>
+        <span>最初から</span>
+      </button>
+    </div>
+
+    <!-- Playback speed (音声モード時のみ表示) -->
+    <div class="inline-row" id="speed-row">
+      <span class="row-label">再生速度：</span>
+      <button class="btn btn-ghost" data-rate="0.5">0.5×</button>
+      <button class="btn btn-ghost" data-rate="0.75">0.75×</button>
+      <button class="btn btn-ghost is-active" data-rate="1.0">1.0×</button>
+      <button class="btn btn-ghost" data-rate="1.25">1.25×</button>
+    </div>
+
+    <!-- Status message -->
+    <p id="status-bar" role="status" aria-live="polite">
+      音声ファイルを選ぶか、「タイムを設定する」でタイムバーのみを使えます。
+    </p>
+  </div>
+
+  <!-- ═══ EDIT PANEL ═══ -->
+  <div class="edit-section">
+
+    <button class="edit-toggle-btn" id="edit-toggle" type="button">
+      <i data-lucide="settings-2" width="14" height="14"></i>
+      編集パネル
+      <i id="edit-chev" data-lucide="chevron-down" width="14" height="14"></i>
+    </button>
+
+    <div id="edit-panel" class="edit-panel">
+
+      <div class="edit-tabs">
+        <button class="edit-tab active" data-tab="song">🎵 曲情報</button>
+        <button class="edit-tab" data-tab="secs">🎨 区間</button>
+        <button class="edit-tab" data-tab="mks">📍 マーカー</button>
+        <button class="edit-tab" data-tab="io">💾 保存・読み込み</button>
+      </div>
+
+      <!-- Tab: 曲情報 -->
+      <div class="tab-pane active" id="pane-song">
+        <div class="f-row">
+          <span class="f-label">曲名</span>
+          <input id="in-title"    type="text" class="f-input" placeholder="例：運命（第一楽章）">
+        </div>
+        <div class="f-row">
+          <span class="f-label">作曲者</span>
+          <input id="in-composer" type="text" class="f-input" placeholder="例：ベートーヴェン">
+        </div>
+        <button class="btn btn-ink save-btn" id="save-info-btn" type="button">
+          <i data-lucide="check" width="14" height="14"></i>&ensp;保存
+        </button>
+      </div>
+
+      <!-- Tab: 区間 -->
+      <div class="tab-pane" id="pane-secs">
+        <p class="hint">曲の構造（A・B・A'など）を色分けして表示できます。区間を追加したあと「<strong>タイムバーに表示</strong>」ボタンで表示を更新できます。</p>
+        <div id="secs-list" class="item-list"></div>
+        <div class="add-form">
+          <div class="add-form-ttl">＋ 新しい区間を追加</div>
+          <div class="f-row">
+            <span class="f-label">ラベル</span>
+            <input id="s-lbl" type="text" class="f-input" placeholder="例：主題A, コーダ">
+          </div>
+          <div class="f-row">
+            <span class="f-label">開始（秒）</span>
+            <input id="s-st" type="number" class="f-input" placeholder="0" min="0" step="0.1">
+            <button class="btn btn-ghost now-btn" id="s-st-now" type="button">現在位置</button>
+          </div>
+          <div class="f-row">
+            <span class="f-label">終了（秒）</span>
+            <input id="s-en" type="number" class="f-input" placeholder="30" min="0" step="0.1">
+            <button class="btn btn-ghost now-btn" id="s-en-now" type="button">現在位置</button>
+          </div>
+          <div class="f-row">
+            <span class="f-label">色</span>
+            <div class="chips" id="s-chips"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+            <button class="btn btn-ink save-btn" id="add-sec-btn" type="button">
+              <i data-lucide="plus" width="14" height="14"></i>&ensp;区間を追加
+            </button>
+            <!-- ③ 表示ボタン -->
+            <button class="btn btn-ghost save-btn" id="show-secs-btn" type="button">
+              <i data-lucide="eye" width="14" height="14"></i>&ensp;タイムバーに表示
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: マーカー -->
+      <div class="tab-pane" id="pane-mks">
+        <p class="hint">タイムラインを<strong>ダブルクリック</strong>するとすばやくマーカーを追加できます（自動でA, B, C...と名前が付きます）。マーカーの文字（A, B...）をクリックすると削除できます。</p>
+        <div id="mks-list" class="item-list"></div>
+        <div class="add-form">
+          <div class="add-form-ttl">＋ 新しいマーカーを手動で追加</div>
+          <div class="f-row">
+            <span class="f-label">ラベル</span>
+            <input id="m-lbl" type="text" class="f-input" placeholder="例：A, B, C">
+          </div>
+          <div class="f-row">
+            <span class="f-label">コメント</span>
+            <input id="m-cmt" type="text" class="f-input" placeholder="例：バイオリンが主役">
+          </div>
+          <div class="f-row">
+            <span class="f-label">時刻（秒）</span>
+            <input id="m-time" type="number" class="f-input" placeholder="0" min="0" step="0.1">
+            <button class="btn btn-ghost now-btn" id="m-now" type="button">現在位置</button>
+          </div>
+          <button class="btn btn-ink save-btn" id="add-mk-btn" type="button">
+            <i data-lucide="plus" width="14" height="14"></i>&ensp;マーカーを追加
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: 保存・読み込み -->
+      <div class="tab-pane" id="pane-io">
+        <p class="hint">区間・マーカーなどの設定をJSONファイルとして保存・共有できます。音声ファイル自体は含まれません。別の先生に設定ファイルだけを送れば、同じ設定で授業が行えます。</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;">
+          <button class="btn btn-ink save-btn" id="export-btn" type="button">
+            <i data-lucide="download" width="15" height="15"></i>&ensp;設定をJSONで保存
+          </button>
+          <label class="btn btn-ghost save-btn" style="cursor:pointer;position:relative;">
+            <i data-lucide="upload" width="15" height="15"></i>&ensp;JSONを読み込む
+            <input id="import-in" type="file" accept=".json,application/json" class="file-hidden">
+          </label>
+        </div>
+      </div>
+
+    </div><!-- .edit-panel -->
+  </div><!-- .edit-section -->
+
+</div><!-- .card -->
+</div><!-- .app -->
+
+<!-- ══════════════════════════════════════════════
+     MODAL（汎用 + タイム設定モーダル）
+     ══════════════════════════════════════════════ -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal-box">
+    <h2 id="modal-title"></h2>
+    <div id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost save-btn" id="modal-cancel" type="button">キャンセル</button>
+      <button class="btn btn-ink  save-btn" id="modal-ok"     type="button">設定する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ② タイム設定専用モーダル -->
+<div class="modal-bg" id="timeset-modal-bg">
+  <div class="modal-box">
+    <h2>タイムを設定する</h2>
+    <p class="hint" style="margin-bottom:18px;">音声は別の機器から流す場合など、タイムバーだけを手動で動かしたいときに使います。<br>曲の長さ（総時間）を入力してください。</p>
+    <div class="f-row" style="margin-bottom:20px;">
+      <span class="f-label">総時間</span>
+      <input id="ts-min" type="number" class="f-input f-input-sm" placeholder="0" min="0" max="99" step="1">
+      <span style="font-weight:700;color:var(--muted);">分</span>
+      <input id="ts-sec" type="number" class="f-input f-input-sm" placeholder="0" min="0" max="59" step="1">
+      <span style="font-weight:700;color:var(--muted);">秒</span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost save-btn" id="timeset-cancel" type="button">キャンセル</button>
+      <button class="btn btn-orange-lt save-btn" id="timeset-ok" type="button" style="color:var(--ink);">
+        <i data-lucide="check" width="14" height="14"></i>&ensp;タイムバーを開始
+      </button>
+    </div>
+  </div>
+</div>
+
+<audio id="audio" preload="metadata"></audio>
+
+<!-- ══════════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────────────────────────
+const S = {
+  title:    "",
+  composer: "",
+  markers:  [],  // { id, time, label, comment }
+  sections: [],  // { id, start, end, label, color }
+  _id: 1,
+};
+
+// ② 手動タイマー状態
+let manualDuration  = 0;    // 手動設定された総時間（秒）
+let manualCurrent   = 0;    // 手動の現在時刻（秒）
+let manualInterval  = null; // setInterval ID
+let isManualMode    = false; // 手動モード中か
+
+let _nextId = 1;
+function nid() { return _nextId++; }
+
+// ─────────────────────────────────────────────────────────────────
+//  COLOR PALETTES
+// ─────────────────────────────────────────────────────────────────
+const COLS = [
+  { n: "黄色",     v: "#ffd51c" },
+  { n: "青",       v: "#4f8ff5" },
+  { n: "水色",     v: "#52c6df" },
+  { n: "緑",       v: "#c4ef72" },
+  { n: "ピンク",   v: "#ff8fa3" },
+  { n: "紫",       v: "#c084fc" },
+  { n: "オレンジ", v: "#fb923c" },
+  { n: "赤",       v: "#ee5c45" },
+];
+
+const selChip = {};
+
+function buildChips(setId, defIdx = 0) {
+  const c = g(setId);
+  if (!c) return;
+  c.innerHTML = "";
+  if (!selChip[setId]) selChip[setId] = COLS[defIdx].v;
+  COLS.forEach(col => {
+    const ch = document.createElement("button");
+    ch.type = "button";
+    ch.className = "chip" + (selChip[setId] === col.v ? " sel" : "");
+    ch.style.background = col.v;
+    ch.title = ch.ariaLabel = col.n;
+    ch.onclick = () => {
+      selChip[setId] = col.v;
+      c.querySelectorAll(".chip").forEach(x => x.classList.toggle("sel", x === ch));
+    };
+    c.appendChild(ch);
+  });
+}
+
+function chipColor(setId) { return selChip[setId] || COLS[0].v; }
+
+// ─────────────────────────────────────────────────────────────────
+//  DOM SHORTCUTS
+// ─────────────────────────────────────────────────────────────────
+function g(id)   { return document.getElementById(id); }
+function qsa(sel){ return document.querySelectorAll(sel); }
+
+const audio    = g("audio");
+const mainTl   = g("main-tl");
+const secClip  = g("sec-clip");
+const progOv   = g("prog-ov");
+const phHead   = g("playhead");
+const mkWrap   = g("mk-wrap");
+const curTimeEl= g("cur-time");
+const totTimeEl= g("tot-time");
+const statusEl = g("status-bar");
+const titleDisp= g("song-title-disp");
+const cmpDisp  = g("song-composer-disp");
+
+// ─────────────────────────────────────────────────────────────────
+//  UTILITIES
+// ─────────────────────────────────────────────────────────────────
+function fmt(sec) {
+  if (!isFinite(sec) || sec < 0) return "0分00秒";
+  return Math.floor(sec / 60) + "分" + String(Math.floor(sec % 60)).padStart(2, "0") + "秒";
+}
+
+// ③ dur()は手動モードも考慮
+function dur() {
+  if (isManualMode) return manualDuration;
+  const d = audio.duration;
+  return isFinite(d) && d > 0 ? d : 0;
+}
+
+function curTime() {
+  if (isManualMode) return manualCurrent;
+  return audio.currentTime;
+}
+
+function toPct(t) { const d = dur(); return d > 0 ? Math.min(100, Math.max(0, t / d * 100)) : 0; }
+function toTime(p){ return (p / 100) * dur(); }
+
+function tlFrac(ev) {
+  const r = mainTl.getBoundingClientRect();
+  return r.width > 0 ? Math.max(0, Math.min(ev.clientX - r.left, r.width)) / r.width : 0;
+}
+
+function status(msg) { statusEl.textContent = msg; }
+
+function esc(s) {
+  return (s || "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function getNextMarkerLabel() {
+  const letters = S.markers.map(m => m.label).filter(l => /^[A-Z]$/.test(l));
+  if (letters.length === 0) return "A";
+  const maxCode = Math.max(...letters.map(l => l.charCodeAt(0)));
+  return String.fromCharCode(maxCode + 1);
+}
+
+const ICO_EDIT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+const ICO_DEL  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+const ICO_EYE  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const ICO_EYE_OFF = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
+
+function mkIconBtn(extraCls, svgHtml, title) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "ico-btn" + (extraCls ? " " + extraCls : "");
+  b.title = b.ariaLabel = title;
+  b.innerHTML = svgHtml;
+  return b;
+}
+
+function mkItem(dotColor, mainText, subText) {
+  const el  = document.createElement("div");
+  el.className = "item";
+  const dot = document.createElement("div");
+  dot.className = "item-dot";
+  dot.style.background = dotColor;
+  const info = document.createElement("div");
+  info.className = "item-info";
+  info.innerHTML = `<div class="item-main">${esc(mainText)}</div><div class="item-sub">${esc(subText)}</div>`;
+  const acts = document.createElement("div");
+  acts.className = "item-acts";
+  el.append(dot, info, acts);
+  return el;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  MASTER RENDER
+// ─────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderSections();
+  renderMarkers();
+  updatePlayhead();
+}
+
+// ─── Section bands ───────────────────────────────────────────────
+function renderSections() {
+  secClip.innerHTML = "";
+  const d = dur();
+  if (d <= 0) return;
+  S.sections.forEach(s => {
+    if (s.hidden) return;
+    const el = document.createElement("div");
+    el.className = "sec-band";
+    el.style.cssText = `left:${toPct(s.start)}%;width:${toPct(s.end) - toPct(s.start)}%;background:${s.color};`;
+    const lbl = document.createElement("span");
+    lbl.className = "sec-band-lbl";
+    lbl.textContent = s.label;
+    el.appendChild(lbl);
+    secClip.appendChild(el);
+  });
+}
+
+// ─── Marker lines ────────────────────────────────────────────────
+function renderMarkers() {
+  mkWrap.innerHTML = "";
+  const d = dur();
+  if (d <= 0) return;
+  S.markers.forEach(mk => {
+    const el = document.createElement("div");
+    el.className = "marker";
+    el.style.left = toPct(mk.time) + "%";
+    el.setAttribute("role", "button");
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("aria-label", (mk.label || "マーカー") + " — クリックでジャンプ");
+
+    if (mk.label) {
+      const lbl = document.createElement("div");
+      lbl.className = "mk-lbl-always";
+      lbl.textContent = mk.label;
+      lbl.title = "クリックで削除";
+      lbl.addEventListener("click", ev => {
+        ev.stopPropagation();
+        S.markers = S.markers.filter(m => m.id !== mk.id);
+        renderMarkers();
+        renderMksList();
+        status(`マーカー「${mk.label}」を削除しました。`);
+      });
+      el.appendChild(lbl);
+    }
+
+    if (mk.comment) {
+      const tip = document.createElement("div");
+      tip.className = "mk-tip";
+      tip.textContent = mk.comment;
+      el.appendChild(tip);
+    }
+
+    el.addEventListener("click", ev => {
+      ev.stopPropagation();
+      seekTo(mk.time);
+    });
+
+    mkWrap.appendChild(el);
+  });
+}
+
+// ─── Playhead + time display ──────────────────────────────────────
+function updatePlayhead() {
+  const d = dur(), c = curTime();
+  if (d <= 0) {
+    progOv.style.width    = "0%";
+    phHead.style.display  = "none";
+    curTimeEl.textContent = "0分00秒";
+    totTimeEl.textContent = "0分00秒";
+    mainTl.setAttribute("aria-valuemax", "0");
+    mainTl.setAttribute("aria-valuenow", "0");
+    return;
+  }
+  const pct = toPct(c);
+  progOv.style.width    = pct + "%";
+  phHead.style.display  = "block";
+  phHead.style.left     = pct + "%";
+  curTimeEl.textContent = fmt(c);
+  totTimeEl.textContent = fmt(d);
+  mainTl.setAttribute("aria-valuemax",  String(Math.round(d)));
+  mainTl.setAttribute("aria-valuenow",  String(Math.round(c)));
+  mainTl.setAttribute("aria-valuetext", fmt(c) + " / " + fmt(d));
+}
+
+// ─── Seek helper ──────────────────────────────────────────────────
+function seekTo(t) {
+  if (dur() <= 0) return;
+  if (isManualMode) {
+    manualCurrent = Math.max(0, Math.min(manualDuration, t));
+  } else {
+    audio.currentTime = Math.max(0, Math.min(dur(), t));
+  }
+  updatePlayhead();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  ② MANUAL TIMER MODE
+// ─────────────────────────────────────────────────────────────────
+function startManualMode(totalSec) {
+  // 既存の手動タイマーをリセット
+  stopManualTimer();
+
+  // 音声モードと競合しないよう音声を停止（srcはクリアしない→errorイベント防止）
+  if (!audio.paused) audio.pause();
+
+  manualDuration = totalSec;
+  manualCurrent  = 0;
+  isManualMode   = true;
+
+  // バッジ表示
+  const badge = g("manual-badge");
+  g("manual-badge-txt").textContent = `手動タイマーモード（総時間：${fmt(totalSec)}）`;
+  badge.classList.add("show");
+
+  // 再生ボタンを有効化
+  g("play-btn").disabled    = false;
+  g("restart-btn").disabled = false;
+
+  // 速度ボタン行を隠す（手動モードでは不要）
+  g("speed-row").style.display = "none";
+
+  renderAll();
+  status(`タイムバーを設定しました（総時間：${fmt(totalSec)}）。▶ 再生ボタンで計時を開始します。`);
+}
+
+function stopManualTimer() {
+  if (manualInterval) {
+    clearInterval(manualInterval);
+    manualInterval = null;
+  }
+}
+
+function resetManualMode() {
+  stopManualTimer();
+  isManualMode   = false;
+  manualDuration = 0;
+  manualCurrent  = 0;
+  g("manual-badge").classList.remove("show");
+  g("speed-row").style.display = "";
+  g("play-btn").disabled    = true;
+  g("restart-btn").disabled = true;
+  g("play-ico").setAttribute("data-lucide", "play");
+  g("play-txt").textContent = "再生";
+  lucide.createIcons();
+  updatePlayhead();
+  renderSections();
+  renderMarkers();
+  status("手動タイマーをリセットしました。");
+}
+
+function tickManualTimer() {
+  manualCurrent += 0.1;
+  if (manualCurrent >= manualDuration) {
+    manualCurrent = manualDuration;
+    stopManualTimer();
+    updatePlayhead();
+    g("play-ico").setAttribute("data-lucide", "play");
+    g("play-txt").textContent = "再生";
+    lucide.createIcons();
+    status("計時が終了しました。「最初から」ボタンで最初に戻せます。");
+    return;
+  }
+  updatePlayhead();
+}
+
+// タイム設定ボタン
+g("set-time-btn").addEventListener("click", () => {
+  g("ts-min").value = "";
+  g("ts-sec").value = "";
+  g("timeset-modal-bg").classList.add("open");
+  setTimeout(() => g("ts-min").focus(), 50);
+});
+
+g("timeset-cancel").addEventListener("click", () => {
+  g("timeset-modal-bg").classList.remove("open");
+});
+
+g("timeset-modal-bg").addEventListener("click", ev => {
+  if (ev.target === g("timeset-modal-bg")) g("timeset-modal-bg").classList.remove("open");
+});
+
+g("timeset-ok").addEventListener("click", () => {
+  const m = parseInt(g("ts-min").value) || 0;
+  const s = parseInt(g("ts-sec").value) || 0;
+  const total = m * 60 + s;
+  if (total <= 0) {
+    g("ts-min").focus();
+    return;
+  }
+  g("timeset-modal-bg").classList.remove("open");
+  startManualMode(total);
+});
+
+// Enterキーでも確定
+g("ts-sec").addEventListener("keydown", ev => {
+  if (ev.key === "Enter") g("timeset-ok").click();
+});
+
+// バッジのリセットボタン
+g("manual-reset-btn").addEventListener("click", resetManualMode);
+
+// ─────────────────────────────────────────────────────────────────
+//  AUDIO ENGINE
+// ─────────────────────────────────────────────────────────────────
+let objUrl = null;
+
+g("audio-in").addEventListener("change", function () {
+  const f = this.files && this.files[0];
+  if (!f) return;
+
+  // 手動モード解除
+  if (isManualMode) resetManualMode();
+
+  if (objUrl) URL.revokeObjectURL(objUrl);
+  objUrl = URL.createObjectURL(f);
+  audio.src = objUrl;
+  audio.load();
+  g("play-btn").disabled    = false;
+  g("restart-btn").disabled = false;
+  g("speed-row").style.display = "";
+  status(`「${f.name}」を読み込みました。▶ 再生ボタンを押してください。`);
+});
+
+audio.addEventListener("loadedmetadata", () => renderAll());
+audio.addEventListener("timeupdate",     () => { if (!isManualMode) updatePlayhead(); });
+
+audio.addEventListener("play", () => {
+  g("play-ico").setAttribute("data-lucide", "pause");
+  g("play-txt").textContent = "一時停止";
+  lucide.createIcons();
+  if (!isManualMode) status("再生中です。タイムラインをダブルクリックするとマーカーが付きます。");
+});
+
+audio.addEventListener("pause", () => {
+  if (!audio.ended && !isManualMode) {
+    g("play-ico").setAttribute("data-lucide", "play");
+    g("play-txt").textContent = "再生";
+    lucide.createIcons();
+  }
+});
+
+audio.addEventListener("ended", () => {
+  audio.currentTime = 0;
+  updatePlayhead();
+  g("play-ico").setAttribute("data-lucide", "play");
+  g("play-txt").textContent = "再生";
+  lucide.createIcons();
+  status("曲が終わりました。もう一度聴くには「最初から」ボタンを押してください。");
+});
+
+audio.addEventListener("error", () => {
+  status("この音声ファイルは再生できませんでした。別のファイルを選んでください。");
+  g("play-btn").disabled    = true;
+  g("restart-btn").disabled = true;
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  PLAYBACK CONTROLS
+// ─────────────────────────────────────────────────────────────────
+g("play-btn").addEventListener("click", async () => {
+  if (isManualMode) {
+    // 手動モードの再生・一時停止
+    if (manualInterval) {
+      // 一時停止
+      stopManualTimer();
+      g("play-ico").setAttribute("data-lucide", "play");
+      g("play-txt").textContent = "再生";
+      lucide.createIcons();
+      status("一時停止しました。");
+    } else {
+      // 再生（終端なら最初から）
+      if (manualCurrent >= manualDuration) manualCurrent = 0;
+      manualInterval = setInterval(tickManualTimer, 100);
+      g("play-ico").setAttribute("data-lucide", "pause");
+      g("play-txt").textContent = "一時停止";
+      lucide.createIcons();
+      status("計時中です。タイムラインをダブルクリックするとマーカーが付きます。");
+    }
+    return;
+  }
+
+  if (!audio.src) return;
+  if (audio.paused) {
+    try { await audio.play(); }
+    catch { status("再生できませんでした。"); }
+  } else {
+    audio.pause();
+    status("一時停止しました。");
+  }
+});
+
+g("restart-btn").addEventListener("click", async () => {
+  if (isManualMode) {
+    stopManualTimer();
+    manualCurrent = 0;
+    updatePlayhead();
+    status("最初に戻しました。再生ボタンで計時を開始してください。");
+    g("play-ico").setAttribute("data-lucide", "play");
+    g("play-txt").textContent = "再生";
+    lucide.createIcons();
+    return;
+  }
+  if (!audio.src) return;
+  audio.currentTime = 0;
+  updatePlayhead();
+  try { await audio.play(); }
+  catch { status("最初に戻しました。再生ボタンを押してください。"); }
+});
+
+// Speed buttons
+qsa("[data-rate]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const r = parseFloat(btn.dataset.rate);
+    audio.playbackRate = r;
+    qsa("[data-rate]").forEach(b => b.classList.remove("is-active"));
+    btn.classList.add("is-active");
+    status(`再生速度を ${r}× に変更しました。`);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  TIMELINE INTERACTION
+// ─────────────────────────────────────────────────────────────────
+let seekTimer = null;
+
+mainTl.addEventListener("click", ev => {
+  if (ev.target.classList.contains("marker") || ev.target.classList.contains("mk-lbl-always")) return;
+  clearTimeout(seekTimer);
+  seekTimer = setTimeout(() => {
+    if (dur() <= 0) return;
+    seekTo(tlFrac(ev) * dur());
+    status(`${fmt(curTime())} に移動しました。`);
+  }, 210);
+});
+
+mainTl.addEventListener("dblclick", ev => {
+  if (ev.target.classList.contains("marker") || ev.target.classList.contains("mk-lbl-always")) return;
+  ev.preventDefault();
+  clearTimeout(seekTimer);
+  seekTimer = null;
+  if (dur() <= 0) return;
+  const t = tlFrac(ev) * dur();
+  const label = getNextMarkerLabel();
+  S.markers.push({ id: nid(), time: t, label, comment: "" });
+  S.markers.sort((a, b) => a.time - b.time);
+  renderMarkers();
+  renderMksList();
+  status(`${fmt(t)} に ${label}点 を追加しました。`);
+});
+
+mainTl.addEventListener("contextmenu", ev => {
+  ev.preventDefault();
+  if (dur() <= 0) return;
+  const t = tlFrac(ev) * dur();
+  const label = getNextMarkerLabel();
+  S.markers.push({ id: nid(), time: t, label, comment: "" });
+  S.markers.sort((a, b) => a.time - b.time);
+  renderMarkers();
+  renderMksList();
+  status(`${fmt(t)} に ${label}点 を追加しました。`);
+});
+
+mainTl.addEventListener("keydown", ev => {
+  if (dur() <= 0) return;
+  const step = ev.shiftKey ? 10 : 5;
+  if (ev.key === "ArrowRight") { ev.preventDefault(); seekTo(curTime() + step); }
+  if (ev.key === "ArrowLeft")  { ev.preventDefault(); seekTo(curTime() - step); }
+  if (ev.key === "Home")       { ev.preventDefault(); seekTo(0); }
+  if (ev.key === "End")        { ev.preventDefault(); seekTo(dur()); }
+});
+
+let touching = false;
+mainTl.addEventListener("touchstart",  () => { touching = true; }, { passive: true });
+mainTl.addEventListener("touchmove", ev => {
+  if (!touching || dur() <= 0) return;
+  const r = mainTl.getBoundingClientRect();
+  seekTo(Math.max(0, Math.min(1, (ev.touches[0].clientX - r.left) / r.width)) * dur());
+}, { passive: true });
+mainTl.addEventListener("touchend", () => { touching = false; });
+
+// ─────────────────────────────────────────────────────────────────
+//  EDIT PANEL TOGGLE
+// ─────────────────────────────────────────────────────────────────
+g("edit-toggle").addEventListener("click", () => {
+  const open = g("edit-panel").classList.toggle("open");
+  g("edit-chev").setAttribute("data-lucide", open ? "chevron-up" : "chevron-down");
+  lucide.createIcons();
+});
+
+qsa(".edit-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    qsa(".edit-tab").forEach(t => t.classList.remove("active"));
+    qsa(".tab-pane").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    const pane = g("pane-" + tab.dataset.tab);
+    if (pane) pane.classList.add("active");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  TAB: 曲情報
+// ─────────────────────────────────────────────────────────────────
+g("save-info-btn").addEventListener("click", () => {
+  S.title    = g("in-title").value.trim();
+  S.composer = g("in-composer").value.trim();
+  titleDisp.textContent  = S.title;
+  titleDisp.style.display  = S.title    ? "block" : "none";
+  cmpDisp.textContent    = S.composer;
+  cmpDisp.style.display    = S.composer  ? "block" : "none";
+  status("曲情報を更新しました。");
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  TAB: 区間
+// ─────────────────────────────────────────────────────────────────
+function renderSecsList() {
+  const list = g("secs-list");
+  list.innerHTML = "";
+  if (S.sections.length === 0) {
+    list.innerHTML = '<p class="hint">まだ区間がありません。</p>';
+    return;
+  }
+  S.sections.forEach(s => {
+    const el  = mkItem(s.color, s.label || "（ラベルなし）", fmt(s.start) + " 〜 " + fmt(s.end));
+    
+    // 表示/非表示切り替えボタン
+    const isHidden = !!s.hidden;
+    const toggleBtn = mkIconBtn("", isHidden ? ICO_EYE_OFF : ICO_EYE, isHidden ? "表示する" : "非表示にする");
+    toggleBtn.addEventListener("click", () => {
+      s.hidden = !s.hidden;
+      renderSections();
+      renderSecsList();
+    });
+
+    const del = mkIconBtn("del", ICO_DEL, "削除");
+    del.addEventListener("click", () => {
+      S.sections = S.sections.filter(x => x.id !== s.id);
+      renderSections();
+      renderSecsList();
+      status("区間を削除しました。");
+    });
+    
+    el.querySelector(".item-acts").append(toggleBtn, del);
+    list.appendChild(el);
+  });
+}
+
+g("s-st-now").addEventListener("click", () => { g("s-st").value = curTime().toFixed(1); });
+g("s-en-now").addEventListener("click", () => { g("s-en").value = curTime().toFixed(1); });
+
+g("add-sec-btn").addEventListener("click", () => {
+  const label = g("s-lbl").value.trim();
+  const start = parseFloat(g("s-st").value);
+  const end   = parseFloat(g("s-en").value);
+  const color = chipColor("s-chips");
+  if (!isFinite(start) || !isFinite(end)) { status("開始・終了の秒数を入力してください。"); return; }
+  if (start >= end) { status("開始は終了より前の時刻にしてください。"); return; }
+  S.sections.push({ id: nid(), start, end, label: label || "区間", color, hidden: false });
+  S.sections.sort((a, b) => a.start - b.start);
+  g("s-lbl").value = g("s-st").value = g("s-en").value = "";
+  renderSecsList();
+  renderSections();
+  status(`区間「${label || "区間"}」を追加しました。`);
+});
+
+// ③ 「タイムバーに表示」ボタン
+g("show-secs-btn").addEventListener("click", () => {
+  // 全ての区間を表示状態にする
+  S.sections.forEach(s => s.hidden = false);
+
+  // 総時間が未設定の場合、区間の最大終了時刻を総時間として使う
+  if (dur() <= 0 && S.sections.length > 0) {
+    const maxEnd = Math.max(...S.sections.map(s => s.end));
+    if (maxEnd > 0) {
+      manualDuration = maxEnd;
+      isManualMode   = true;
+      manualCurrent  = 0;
+      g("manual-badge-txt").textContent = `区間表示モード（総時間：${fmt(maxEnd)}）`;
+      g("manual-badge").classList.add("show");
+      g("play-btn").disabled    = true;   // 再生は音声/タイム設定から使う
+      g("restart-btn").disabled = true;
+      g("speed-row").style.display = "none";
+    }
+  }
+  if (dur() <= 0) {
+    status("先に音声ファイルを開くか、「タイムを設定する」で総時間を設定してください。");
+    return;
+  }
+  renderSections();
+  renderSecsList();
+  renderMarkers();
+  updatePlayhead();
+  status("すべての区間をタイムバーに表示しました。");
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  TAB: マーカー
+// ─────────────────────────────────────────────────────────────────
+function renderMksList() {
+  const list = g("mks-list");
+  list.innerHTML = "";
+  if (S.markers.length === 0) {
+    list.innerHTML = '<p class="hint">まだマーカーがありません。タイムラインをダブルクリックして追加できます。</p>';
+    return;
+  }
+  S.markers.forEach(mk => {
+    const title = `${mk.label ? mk.label + '点' : 'マーカー'}：${fmt(mk.time)}`;
+    const sub   = mk.comment || "";
+    const el    = mkItem("var(--blue)", title, sub);
+    const acts  = el.querySelector(".item-acts");
+
+    const editBtn = mkIconBtn("", ICO_EDIT, "編集");
+    editBtn.addEventListener("click", () => openEditMkModal(mk));
+
+    const del = mkIconBtn("del", ICO_DEL, "削除");
+    del.addEventListener("click", () => {
+      S.markers = S.markers.filter(x => x.id !== mk.id);
+      renderMarkers();
+      renderMksList();
+      status("マーカーを削除しました。");
+    });
+
+    acts.append(editBtn, del);
+    list.appendChild(el);
+  });
+}
+
+function openEditMkModal(mk) {
+  openModal("マーカーを編集", `
+    <div class="f-row"><span class="f-label">ラベル</span><input id="e-lbl" type="text" class="f-input" value="${esc(mk.label)}" placeholder="例: A"></div>
+    <div class="f-row"><span class="f-label">コメント</span><input id="e-cmt" type="text" class="f-input" value="${esc(mk.comment)}" placeholder="例：バイオリンが主役"></div>
+    <div class="f-row"><span class="f-label">時刻（秒）</span><input id="e-t" type="number" class="f-input" value="${mk.time.toFixed(1)}" min="0" step="0.1"></div>
+  `, () => {
+    mk.label   = g("e-lbl").value.trim();
+    mk.comment = g("e-cmt").value.trim();
+    const t = parseFloat(g("e-t").value);
+    if (isFinite(t)) mk.time = t;
+    S.markers.sort((a, b) => a.time - b.time);
+    renderMarkers();
+    renderMksList();
+    status("マーカーを更新しました。");
+  });
+}
+
+g("m-now").addEventListener("click", () => { g("m-time").value = curTime().toFixed(1); });
+
+g("add-mk-btn").addEventListener("click", () => {
+  const label   = g("m-lbl").value.trim();
+  const comment = g("m-cmt").value.trim();
+  const time    = parseFloat(g("m-time").value);
+  if (!isFinite(time)) { status("時刻を入力してください。"); return; }
+  S.markers.push({ id: nid(), time, label: label || getNextMarkerLabel(), comment });
+  S.markers.sort((a, b) => a.time - b.time);
+  g("m-lbl").value = g("m-cmt").value = g("m-time").value = "";
+  renderMarkers();
+  renderMksList();
+  status("マーカーを追加しました。");
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  TAB: 保存・読み込み（JSON I/O）
+// ─────────────────────────────────────────────────────────────────
+g("export-btn").addEventListener("click", () => {
+  const data = {
+    version:   1,
+    title:     S.title,
+    composer:  S.composer,
+    markers:   S.markers.map(m  => ({ time: m.time, label: m.label, comment: m.comment })),
+    sections:  S.sections.map(s => ({ start: s.start, end: s.end, label: s.label, color: s.color, hidden: !!s.hidden }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = (S.title || "music-appreciation") + ".map.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  status("設定をJSONファイルとして保存しました。");
+});
+
+g("import-in").addEventListener("change", function () {
+  const f = this.files && this.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      loadJSON(JSON.parse(ev.target.result));
+      status("設定ファイルを読み込みました。");
+    } catch {
+      status("JSONファイルの読み込みに失敗しました。正しいファイルか確認してください。");
+    }
+  };
+  reader.readAsText(f);
+  this.value = "";
+});
+
+function loadJSON(d) {
+  if (!d || d.version !== 1) { status("このJSONファイルは対応していない形式です。"); return; }
+  S.title    = d.title    || "";
+  S.composer = d.composer || "";
+  S.markers  = (d.markers  || []).map(m => ({ id: nid(), time: +(m.time) || 0, label: m.label || "", comment: m.comment || "" }));
+  S.sections = (d.sections || []).map(s => ({ id: nid(), start: +(s.start) || 0, end: +(s.end) || 0, label: s.label || "", color: s.color || COLS[0].v, hidden: !!s.hidden }));
+
+  g("in-title").value    = S.title;
+  g("in-composer").value = S.composer;
+  titleDisp.textContent  = S.title;    titleDisp.style.display  = S.title    ? "block" : "none";
+  cmpDisp.textContent    = S.composer; cmpDisp.style.display    = S.composer ? "block" : "none";
+
+  renderAll();
+  renderSecsList();
+  renderMksList();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  MODAL SYSTEM
+// ─────────────────────────────────────────────────────────────────
+let modalCb = null;
+
+function openModal(title, bodyHtml, onOk) {
+  g("modal-title").textContent = title;
+  g("modal-body").innerHTML    = bodyHtml;
+  modalCb = onOk;
+  g("modal-bg").classList.add("open");
+  setTimeout(() => { const f = g("modal-body").querySelector("input"); if (f) f.focus(); }, 50);
+}
+
+function closeModal() {
+  g("modal-bg").classList.remove("open");
+  modalCb = null;
+}
+
+g("modal-cancel").addEventListener("click", closeModal);
+g("modal-ok").addEventListener("click", () => { if (modalCb) modalCb(); closeModal(); });
+g("modal-bg").addEventListener("click", ev => { if (ev.target === g("modal-bg")) closeModal(); });
+
+// ─────────────────────────────────────────────────────────────────
+//  INITIALISE
+// ─────────────────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  lucide.createIcons();
+  buildChips("s-chips", 0);
+  renderSecsList();
+  renderMksList();
+});
+
+window.addEventListener("beforeunload", () => {
+  if (objUrl) URL.revokeObjectURL(objUrl);
+  stopManualTimer();
+});
+</script>
+</body>
+</html>
