@@ -393,6 +393,57 @@
       color: var(--muted);
     }
 
+    /* ── Song picker bar ── */
+    #song-picker-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      padding: 12px 18px;
+      background: #f8faff;
+      border: 1.5px solid var(--line);
+      border-radius: 16px;
+    }
+
+    #song-select {
+      flex: 1;
+      min-width: 140px;
+      font-family: inherit;
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--ink);
+      background: #fff;
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    #song-select:focus { border-color: var(--blue); }
+
+    .song-mgr-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      font-family: inherit;
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+      transition: background .14s, border-color .14s;
+      white-space: nowrap;
+    }
+
+    .song-mgr-btn:hover { background: #f0f4ff; border-color: var(--blue); }
+    .song-mgr-btn.danger:hover { background: #fff0ee; border-color: var(--red); color: var(--red); }
+
     /* ── Edit panel ── */
     .edit-section { margin-top: 28px; }
 
@@ -527,6 +578,8 @@
 
     .chip:hover { transform: scale(1.15); }
     .chip.sel   { border-color: var(--ink); }
+    .chip[style*="background: #ffffff"],
+    .chip[style*="background:#ffffff"] { box-shadow: 0 0 0 2.5px #334 inset; }
 
     /* Item lists */
     .item-list {
@@ -773,6 +826,15 @@
     </p>
   </div>
 
+  <!-- ═══ SONG PICKER BAR ═══ -->
+  <div id="song-picker-bar">
+    <span class="row-label" style="white-space:nowrap;">🎵 曲：</span>
+    <select id="song-select" aria-label="曲を選択"></select>
+    <button class="song-mgr-btn" id="song-new-btn" type="button">＋ 新しい曲</button>
+    <button class="song-mgr-btn" id="song-rename-btn" type="button">✏ 名前変更</button>
+    <button class="song-mgr-btn danger" id="song-delete-btn" type="button">🗑 この曲を削除</button>
+  </div>
+
   <!-- ═══ EDIT PANEL ═══ -->
   <div class="edit-section">
 
@@ -788,7 +850,7 @@
         <button class="edit-tab active" data-tab="song">🎵 曲情報</button>
         <button class="edit-tab" data-tab="secs">🎨 区間</button>
         <button class="edit-tab" data-tab="mks">📍 マーカー</button>
-        <button class="edit-tab" data-tab="io">💾 保存・読み込み</button>
+        <button class="edit-tab" data-tab="io">💾 保存データ</button>
       </div>
 
       <!-- Tab: 曲情報 -->
@@ -867,17 +929,24 @@
         </div>
       </div>
 
-      <!-- Tab: 保存・読み込み -->
+      <!-- Tab: 保存データ -->
       <div class="tab-pane" id="pane-io">
-        <p class="hint">区間・マーカーなどの設定をJSONファイルとして保存・共有できます。音声ファイル自体は含まれません。別の先生に設定ファイルだけを送れば、同じ設定で授業が行えます。</p>
+        <!-- 自動保存ステータス -->
+        <div id="autosave-badge" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:#f0fdf4;border:1.5px solid #bbf7d0;margin-bottom:16px;font-size:.83rem;font-weight:700;color:#166534;">
+          <span id="autosave-ico">💾</span>
+          <span id="autosave-txt">設定はブラウザに自動保存されます</span>
+        </div>
+        <!-- 音声ファイル保存状態 -->
+        <div id="audio-saved-badge" style="display:none;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:#eff6ff;border:1.5px solid #bfdbfe;margin-bottom:16px;font-size:.83rem;font-weight:700;color:#1e40af;">
+          <span>🎵</span>
+          <span id="audio-saved-name">（音声ファイル保存中）</span>
+          <button id="audio-clear-btn" type="button" style="margin-left:auto;font-size:.75rem;color:#6b7280;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:700;">✕ 削除</button>
+        </div>
+        <p class="hint">区間・マーカー・曲情報や音声ファイルはブラウザに曲ごとに自動保存されます。次回このページを開いたときも、そのまま前回の状態から続けられます。</p>
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;">
-          <button class="btn btn-ink save-btn" id="export-btn" type="button">
-            <i data-lucide="download" width="15" height="15"></i>&ensp;設定をJSONで保存
+          <button class="btn btn-ghost save-btn" id="clear-all-btn" type="button" style="color:var(--red);">
+            <i data-lucide="trash-2" width="15" height="15"></i>&ensp;この曲のデータをリセット
           </button>
-          <label class="btn btn-ghost save-btn" style="cursor:pointer;position:relative;">
-            <i data-lucide="upload" width="15" height="15"></i>&ensp;JSONを読み込む
-            <input id="import-in" type="file" accept=".json,application/json" class="file-hidden">
-          </label>
         </div>
       </div>
 
@@ -956,6 +1025,7 @@ const COLS = [
   { n: "青",       v: "#4f8ff5" },
   { n: "水色",     v: "#52c6df" },
   { n: "緑",       v: "#c4ef72" },
+  { n: "白",       v: "#ffffff" },
   { n: "ピンク",   v: "#ff8fa3" },
   { n: "紫",       v: "#c084fc" },
   { n: "オレンジ", v: "#fb923c" },
@@ -1125,6 +1195,7 @@ function renderMarkers() {
         S.markers = S.markers.filter(m => m.id !== mk.id);
         renderMarkers();
         renderMksList();
+        saveSettings();
         status(`マーカー「${mk.label}」を削除しました。`);
       });
       el.appendChild(lbl);
@@ -1306,6 +1377,9 @@ g("audio-in").addEventListener("change", function () {
   g("restart-btn").disabled = false;
   g("speed-row").style.display = "";
   status(`「${f.name}」を読み込みました。▶ 再生ボタンを押してください。`);
+
+  // IndexedDB に音声ファイルを保存
+  saveAudio(f);
 });
 
 audio.addEventListener("loadedmetadata", () => renderAll());
@@ -1336,6 +1410,8 @@ audio.addEventListener("ended", () => {
 });
 
 audio.addEventListener("error", () => {
+  // srcが空（曲切り替え時のリセット中）はエラーを無視する
+  if (!audio.src || audio.src === window.location.href) return;
   status("この音声ファイルは再生できませんでした。別のファイルを選んでください。");
   g("play-btn").disabled    = true;
   g("restart-btn").disabled = true;
@@ -1432,6 +1508,7 @@ mainTl.addEventListener("dblclick", ev => {
   S.markers.sort((a, b) => a.time - b.time);
   renderMarkers();
   renderMksList();
+  saveSettings();
   status(`${fmt(t)} に ${label}点 を追加しました。`);
 });
 
@@ -1444,6 +1521,7 @@ mainTl.addEventListener("contextmenu", ev => {
   S.markers.sort((a, b) => a.time - b.time);
   renderMarkers();
   renderMksList();
+  saveSettings();
   status(`${fmt(t)} に ${label}点 を追加しました。`);
 });
 
@@ -1494,6 +1572,7 @@ g("save-info-btn").addEventListener("click", () => {
   titleDisp.style.display  = S.title    ? "block" : "none";
   cmpDisp.textContent    = S.composer;
   cmpDisp.style.display    = S.composer  ? "block" : "none";
+  saveSettings();
   status("曲情報を更新しました。");
 });
 
@@ -1510,6 +1589,10 @@ function renderSecsList() {
   S.sections.forEach(s => {
     const el  = mkItem(s.color, s.label || "（ラベルなし）", fmt(s.start) + " 〜 " + fmt(s.end));
     
+    // 編集ボタン
+    const editBtn = mkIconBtn("", ICO_EDIT, "編集");
+    editBtn.addEventListener("click", () => openEditSecModal(s));
+
     // 表示/非表示切り替えボタン
     const isHidden = !!s.hidden;
     const toggleBtn = mkIconBtn("", isHidden ? ICO_EYE_OFF : ICO_EYE, isHidden ? "表示する" : "非表示にする");
@@ -1517,6 +1600,7 @@ function renderSecsList() {
       s.hidden = !s.hidden;
       renderSections();
       renderSecsList();
+      saveSettings();
     });
 
     const del = mkIconBtn("del", ICO_DEL, "削除");
@@ -1524,16 +1608,60 @@ function renderSecsList() {
       S.sections = S.sections.filter(x => x.id !== s.id);
       renderSections();
       renderSecsList();
+      saveSettings();
       status("区間を削除しました。");
     });
     
-    el.querySelector(".item-acts").append(toggleBtn, del);
+    el.querySelector(".item-acts").append(editBtn, toggleBtn, del);
     list.appendChild(el);
   });
 }
 
-g("s-st-now").addEventListener("click", () => { g("s-st").value = curTime().toFixed(1); });
-g("s-en-now").addEventListener("click", () => { g("s-en").value = curTime().toFixed(1); });
+function openEditSecModal(s) {
+  const chipSetId = "edit-sec-chips";
+  const bodyHtml = `
+    <div class="f-row">
+      <span class="f-label">ラベル</span>
+      <input id="es-lbl" type="text" class="f-input" value="${esc(s.label)}" placeholder="例：主題A">
+    </div>
+    <div class="f-row">
+      <span class="f-label">開始（秒）</span>
+      <input id="es-st" type="number" class="f-input" value="${s.start.toFixed(3)}" min="0" step="0.001">
+    </div>
+    <div class="f-row">
+      <span class="f-label">終了（秒）</span>
+      <input id="es-en" type="number" class="f-input" value="${s.end.toFixed(3)}" min="0" step="0.001">
+    </div>
+    <div class="f-row">
+      <span class="f-label">色</span>
+      <div class="chips" id="${chipSetId}"></div>
+    </div>
+  `;
+  openModal("区間を編集", bodyHtml, () => {
+    const newLabel = g("es-lbl").value.trim();
+    const newStart = parseFloat(g("es-st").value);
+    const newEnd   = parseFloat(g("es-en").value);
+    if (!isFinite(newStart) || !isFinite(newEnd)) { status("開始・終了の秒数を正しく入力してください。"); return; }
+    if (newStart >= newEnd) { status("開始は終了より前の時刻にしてください。"); return; }
+    s.label = newLabel;
+    s.start = newStart;
+    s.end   = newEnd;
+    s.color = chipColor(chipSetId);
+    S.sections.sort((a, b) => a.start - b.start);
+    renderSections();
+    renderSecsList();
+    saveSettings();
+    status(`区間「${newLabel || "区間"}」を更新しました。`);
+  });
+  // モーダルが開いてからchipsを構築（DOMが存在してから）
+  setTimeout(() => {
+    selChip[chipSetId] = s.color;
+    buildChips(chipSetId, 0);
+  }, 10);
+}
+
+g("s-st-now").addEventListener("click", () => { g("s-st").value = curTime().toFixed(3); });
+g("s-en-now").addEventListener("click", () => { g("s-en").value = curTime().toFixed(3); });
 
 g("add-sec-btn").addEventListener("click", () => {
   const label = g("s-lbl").value.trim();
@@ -1547,6 +1675,7 @@ g("add-sec-btn").addEventListener("click", () => {
   g("s-lbl").value = g("s-st").value = g("s-en").value = "";
   renderSecsList();
   renderSections();
+  saveSettings();
   status(`区間「${label || "区間"}」を追加しました。`);
 });
 
@@ -1604,6 +1733,7 @@ function renderMksList() {
       S.markers = S.markers.filter(x => x.id !== mk.id);
       renderMarkers();
       renderMksList();
+      saveSettings();
       status("マーカーを削除しました。");
     });
 
@@ -1616,7 +1746,7 @@ function openEditMkModal(mk) {
   openModal("マーカーを編集", `
     <div class="f-row"><span class="f-label">ラベル</span><input id="e-lbl" type="text" class="f-input" value="${esc(mk.label)}" placeholder="例: A"></div>
     <div class="f-row"><span class="f-label">コメント</span><input id="e-cmt" type="text" class="f-input" value="${esc(mk.comment)}" placeholder="例：バイオリンが主役"></div>
-    <div class="f-row"><span class="f-label">時刻（秒）</span><input id="e-t" type="number" class="f-input" value="${mk.time.toFixed(1)}" min="0" step="0.1"></div>
+    <div class="f-row"><span class="f-label">時刻（秒）</span><input id="e-t" type="number" class="f-input" value="${mk.time.toFixed(3)}" min="0" step="0.001"></div>
   `, () => {
     mk.label   = g("e-lbl").value.trim();
     mk.comment = g("e-cmt").value.trim();
@@ -1625,11 +1755,12 @@ function openEditMkModal(mk) {
     S.markers.sort((a, b) => a.time - b.time);
     renderMarkers();
     renderMksList();
+    saveSettings();
     status("マーカーを更新しました。");
   });
 }
 
-g("m-now").addEventListener("click", () => { g("m-time").value = curTime().toFixed(1); });
+g("m-now").addEventListener("click", () => { g("m-time").value = curTime().toFixed(3); });
 
 g("add-mk-btn").addEventListener("click", () => {
   const label   = g("m-lbl").value.trim();
@@ -1641,64 +1772,9 @@ g("add-mk-btn").addEventListener("click", () => {
   g("m-lbl").value = g("m-cmt").value = g("m-time").value = "";
   renderMarkers();
   renderMksList();
+  saveSettings();
   status("マーカーを追加しました。");
 });
-
-// ─────────────────────────────────────────────────────────────────
-//  TAB: 保存・読み込み（JSON I/O）
-// ─────────────────────────────────────────────────────────────────
-g("export-btn").addEventListener("click", () => {
-  const data = {
-    version:   1,
-    title:     S.title,
-    composer:  S.composer,
-    markers:   S.markers.map(m  => ({ time: m.time, label: m.label, comment: m.comment })),
-    sections:  S.sections.map(s => ({ start: s.start, end: s.end, label: s.label, color: s.color, hidden: !!s.hidden }))
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href     = url;
-  a.download = (S.title || "music-appreciation") + ".map.json";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  status("設定をJSONファイルとして保存しました。");
-});
-
-g("import-in").addEventListener("change", function () {
-  const f = this.files && this.files[0];
-  if (!f) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      loadJSON(JSON.parse(ev.target.result));
-      status("設定ファイルを読み込みました。");
-    } catch {
-      status("JSONファイルの読み込みに失敗しました。正しいファイルか確認してください。");
-    }
-  };
-  reader.readAsText(f);
-  this.value = "";
-});
-
-function loadJSON(d) {
-  if (!d || d.version !== 1) { status("このJSONファイルは対応していない形式です。"); return; }
-  S.title    = d.title    || "";
-  S.composer = d.composer || "";
-  S.markers  = (d.markers  || []).map(m => ({ id: nid(), time: +(m.time) || 0, label: m.label || "", comment: m.comment || "" }));
-  S.sections = (d.sections || []).map(s => ({ id: nid(), start: +(s.start) || 0, end: +(s.end) || 0, label: s.label || "", color: s.color || COLS[0].v, hidden: !!s.hidden }));
-
-  g("in-title").value    = S.title;
-  g("in-composer").value = S.composer;
-  titleDisp.textContent  = S.title;    titleDisp.style.display  = S.title    ? "block" : "none";
-  cmpDisp.textContent    = S.composer; cmpDisp.style.display    = S.composer ? "block" : "none";
-
-  renderAll();
-  renderSecsList();
-  renderMksList();
-}
 
 // ─────────────────────────────────────────────────────────────────
 //  MODAL SYSTEM
@@ -1723,16 +1799,418 @@ g("modal-ok").addEventListener("click", () => { if (modalCb) modalCb(); closeMod
 g("modal-bg").addEventListener("click", ev => { if (ev.target === g("modal-bg")) closeModal(); });
 
 // ─────────────────────────────────────────────────────────────────
-//  INITIALISE
+//  MULTI-SONG STORAGE SYSTEM
+//  localStorage: 曲リスト + 曲ごとの設定
+//  IndexedDB:    曲ごとの音声ファイル
 // ─────────────────────────────────────────────────────────────────
-window.addEventListener("DOMContentLoaded", () => {
+const IDB_NAME  = "music-player";
+const IDB_STORE = "audio";
+const IDX_KEY   = "songs-v2-index";   // 曲一覧: [{id, name}]
+const CUR_KEY   = "songs-v2-current"; // 現在の曲ID
+
+let idb = null;
+let currentSongId = null; // 現在表示している曲のID
+
+// ── ID生成 ──
+function genId() { return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+
+// ── IndexedDB helpers ──
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore(IDB_STORE); };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function idbPut(key, value) {
+  if (!idb) return;
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e.target.error);
+  });
+}
+
+async function idbGet(key) {
+  if (!idb) return null;
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(IDB_STORE, "readonly");
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = e => resolve(e.target.result || null);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function idbDelete(key) {
+  if (!idb) return;
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e.target.error);
+  });
+}
+
+// ── 曲インデックス管理 ──
+function getSongIndex() {
+  try { return JSON.parse(localStorage.getItem(IDX_KEY) || "[]"); } catch { return []; }
+}
+
+function setSongIndex(idx) {
+  localStorage.setItem(IDX_KEY, JSON.stringify(idx));
+}
+
+function addSongToIndex(id, name) {
+  const idx = getSongIndex();
+  idx.push({ id, name });
+  setSongIndex(idx);
+}
+
+function renameSongInIndex(id, newName) {
+  const idx = getSongIndex().map(s => s.id === id ? { ...s, name: newName } : s);
+  setSongIndex(idx);
+}
+
+function removeSongFromIndex(id) {
+  setSongIndex(getSongIndex().filter(s => s.id !== id));
+}
+
+// ── 曲データを localStorage に保存 ──
+function saveSongData(id) {
+  if (!id) return;
+  try {
+    const data = {
+      version:       1,
+      title:         S.title,
+      composer:      S.composer,
+      markers:       S.markers.map(m  => ({ time: m.time, label: m.label, comment: m.comment })),
+      sections:      S.sections.map(s => ({ start: s.start, end: s.end, label: s.label, color: s.color, hidden: !!s.hidden })),
+      manualDuration: isManualMode ? manualDuration : 0,
+    };
+    localStorage.setItem("song-data-" + id, JSON.stringify(data));
+    showAutosaveBadge("saved");
+  } catch(e) {
+    showAutosaveBadge("error");
+  }
+}
+
+// saveSettings は常に現在の曲を保存
+function saveSettings() { saveSongData(currentSongId); }
+
+// ── 曲データを localStorage から読み込み ──
+function loadSongData(id) {
+  try {
+    const raw = localStorage.getItem("song-data-" + id);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (!d || d.version !== 1) return false;
+
+    S.title    = d.title    || "";
+    S.composer = d.composer || "";
+    S.markers  = (d.markers  || []).map(m => ({ id: nid(), time: +(m.time)||0, label: m.label||"", comment: m.comment||"" }));
+    S.sections = (d.sections || []).map(s => ({ id: nid(), start: +(s.start)||0, end: +(s.end)||0, label: s.label||"", color: s.color||COLS[0].v, hidden: !!s.hidden }));
+
+    g("in-title").value    = S.title;
+    g("in-composer").value = S.composer;
+    titleDisp.textContent  = S.title;    titleDisp.style.display  = S.title    ? "block" : "none";
+    cmpDisp.textContent    = S.composer; cmpDisp.style.display    = S.composer ? "block" : "none";
+
+    if (d.manualDuration > 0) {
+      manualDuration = d.manualDuration;
+      manualCurrent  = 0;
+      isManualMode   = true;
+      g("manual-badge-txt").textContent = `手動タイマーモード（総時間：${fmt(manualDuration)}）`;
+      g("manual-badge").classList.add("show");
+      g("play-btn").disabled    = false;
+      g("restart-btn").disabled = false;
+      g("speed-row").style.display = "none";
+    } else {
+      isManualMode = false;
+      g("manual-badge").classList.remove("show");
+    }
+    return true;
+  } catch(e) { return false; }
+}
+
+// ── 曲データを削除 ──
+function deleteSongData(id) {
+  localStorage.removeItem("song-data-" + id);
+}
+
+// ── 音声をIndexedDBに保存 ──
+async function saveAudio(file) {
+  if (!currentSongId) return;
+  try {
+    const buf = await file.arrayBuffer();
+    await idbPut("audio-" + currentSongId, { name: file.name, type: file.type, data: buf });
+    updateAudioBadge(file.name);
+    showAutosaveBadge("saved");
+  } catch(e) { console.warn("音声ファイルの保存失敗", e); }
+}
+
+// ── 音声をIndexedDBから読み込み ──
+async function loadAudio(id) {
+  try {
+    const saved = await idbGet("audio-" + id);
+    if (!saved) { updateAudioBadge(null); return; }
+    const blob = new Blob([saved.data], { type: saved.type });
+    if (objUrl) URL.revokeObjectURL(objUrl);
+    objUrl = URL.createObjectURL(blob);
+    audio.src = objUrl;
+    audio.load();
+    g("play-btn").disabled    = false;
+    g("restart-btn").disabled = false;
+    g("speed-row").style.display = isManualMode ? "none" : "";
+    updateAudioBadge(saved.name);
+    status(`音声ファイル「${saved.name}」を読み込みました。`);
+  } catch(e) { console.warn("音声ファイルの復元失敗", e); updateAudioBadge(null); }
+}
+
+// ── 音声バッジ更新 ──
+function updateAudioBadge(name) {
+  const badge = g("audio-saved-badge");
+  const nameEl = g("audio-saved-name");
+  if (name) { nameEl.textContent = `🎵 ${name}（ブラウザに保存中）`; badge.style.display = "flex"; }
+  else      { badge.style.display = "none"; }
+}
+
+// ── 自動保存バッジ ──
+let autosaveTimer = null;
+function showAutosaveBadge(state) {
+  const ico = g("autosave-ico");
+  const txt = g("autosave-txt");
+  if (!ico || !txt) return;
+  if (state === "saved") {
+    ico.textContent = "✅"; txt.textContent = "設定を自動保存しました";
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => { ico.textContent = "💾"; txt.textContent = "設定はブラウザに自動保存されます"; }, 2000);
+  } else if (state === "error") {
+    ico.textContent = "⚠️"; txt.textContent = "自動保存に失敗しました（プライベートモードでは保存されません）";
+  }
+}
+
+// ── 曲セレクタのUI更新 ──
+function rebuildSongSelect(selectedId) {
+  const sel = g("song-select");
+  sel.innerHTML = "";
+  const idx = getSongIndex();
+  idx.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.name;
+    if (s.id === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ── 曲を切り替え（現在を保存→新しい曲を読み込み） ──
+async function switchSong(newId) {
+  // 現在の曲を保存
+  if (currentSongId) saveSongData(currentSongId);
+
+  // 音声をリセット
+  stopManualTimer();
+  if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
+  audio.pause();
+  audio.removeAttribute("src");
+  g("play-btn").disabled    = true;
+  g("restart-btn").disabled = true;
+  g("speed-row").style.display = "";
+  isManualMode = false;
+  manualDuration = 0; manualCurrent = 0;
+  g("manual-badge").classList.remove("show");
+  g("play-ico").setAttribute("data-lucide", "play");
+  g("play-txt").textContent = "再生";
+
+  // State をクリア
+  S.title = ""; S.composer = ""; S.markers = []; S.sections = [];
+
+  currentSongId = newId;
+  localStorage.setItem(CUR_KEY, newId);
+
+  // 設定を読み込み
+  loadSongData(newId);
+
+  // 音声を読み込み
+  if (!isManualMode) await loadAudio(newId);
+
+  // UI 更新
   lucide.createIcons();
-  buildChips("s-chips", 0);
+  renderAll();
   renderSecsList();
   renderMksList();
+
+  const idx = getSongIndex();
+  const song = idx.find(s => s.id === newId);
+  status(`「${song ? song.name : ""}」に切り替えました。`);
+}
+
+// ── 新しい曲を作成 ──
+async function createNewSong(name) {
+  const id = genId();
+  addSongToIndex(id, name || "新しい曲");
+  // 空データで初期化
+  const empty = { version: 1, title: "", composer: "", markers: [], sections: [], manualDuration: 0 };
+  localStorage.setItem("song-data-" + id, JSON.stringify(empty));
+  rebuildSongSelect(id);
+  await switchSong(id);
+}
+
+// ── 古い単一保存形式からの移行 ──
+function migrateOldData() {
+  const old = localStorage.getItem("map-v1");
+  if (!old) return;
+  try {
+    const d = JSON.parse(old);
+    const id = genId();
+    const name = d.title || "（移行データ）";
+    addSongToIndex(id, name);
+    // そのまま song-data-{id} として保存
+    d.version = 1;
+    localStorage.setItem("song-data-" + id, JSON.stringify(d));
+    // 音声データも移行
+    idbGet("audio-data").then(saved => {
+      if (saved) idbPut("audio-" + id, saved);
+    });
+    localStorage.removeItem("map-v1");
+    return id;
+  } catch { return null; }
+}
+
+// ── Song picker ボタンイベント ──
+g("song-select").addEventListener("change", async function() {
+  const newId = this.value;
+  if (newId === currentSongId) return;
+  await switchSong(newId);
+  rebuildSongSelect(currentSongId);
+});
+
+g("song-new-btn").addEventListener("click", () => {
+  openModal("新しい曲を追加", `
+    <div class="f-row"><span class="f-label">曲の名前</span><input id="new-song-name" type="text" class="f-input" placeholder="例：運命" maxlength="50"></div>
+  `, async () => {
+    const name = (g("new-song-name").value.trim()) || "新しい曲";
+    await createNewSong(name);
+  });
+});
+
+g("song-rename-btn").addEventListener("click", () => {
+  const idx = getSongIndex();
+  const cur = idx.find(s => s.id === currentSongId);
+  openModal("曲の名前を変更", `
+    <div class="f-row"><span class="f-label">新しい名前</span><input id="rename-song-name" type="text" class="f-input" value="${esc(cur ? cur.name : "")}" maxlength="50"></div>
+  `, () => {
+    const name = (g("rename-song-name").value.trim()) || "新しい曲";
+    renameSongInIndex(currentSongId, name);
+    rebuildSongSelect(currentSongId);
+    showAutosaveBadge("saved");
+    status(`曲名を「${name}」に変更しました。`);
+  });
+});
+
+g("song-delete-btn").addEventListener("click", async () => {
+  const idx = getSongIndex();
+  if (idx.length <= 1) { alert("最後の1曲は削除できません。"); return; }
+  const cur = idx.find(s => s.id === currentSongId);
+  if (!confirm(`「${cur ? cur.name : "この曲"}」を削除します。よろしいですか？`)) return;
+
+  const deletedId = currentSongId;
+  const remaining = idx.filter(s => s.id !== deletedId);
+  const nextId = remaining[0].id;
+
+  removeSongFromIndex(deletedId);
+  deleteSongData(deletedId);
+  await idbDelete("audio-" + deletedId);
+
+  rebuildSongSelect(nextId);
+  await switchSong(nextId);
+  status("曲を削除しました。");
+});
+
+// ── 音声クリアボタン ──
+g("audio-clear-btn").addEventListener("click", async () => {
+  await idbDelete("audio-" + currentSongId);
+  if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
+  audio.src = "";
+  g("play-btn").disabled    = true;
+  g("restart-btn").disabled = true;
+  updateAudioBadge(null);
+  status("音声ファイルをブラウザから削除しました。");
+});
+
+// ── すべてリセット（現在の曲のみ） ──
+g("clear-all-btn").addEventListener("click", () => {
+  if (!confirm("この曲のマーカー・区間・曲情報・音声ファイルをすべてリセットします。よろしいですか？")) return;
+  S.title = ""; S.composer = ""; S.markers = []; S.sections = [];
+  if (isManualMode) resetManualMode();
+  g("in-title").value = ""; g("in-composer").value = "";
+  titleDisp.textContent = ""; titleDisp.style.display = "none";
+  cmpDisp.textContent   = ""; cmpDisp.style.display   = "none";
+  deleteSongData(currentSongId);
+  idbDelete("audio-" + currentSongId);
+  if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
+  audio.pause();
+  audio.removeAttribute("src");
+  g("play-btn").disabled    = true;
+  g("restart-btn").disabled = true;
+  updateAudioBadge(null);
+  saveSettings();
+  renderAll(); renderSecsList(); renderMksList();
+  status("この曲の設定をすべてリセットしました。");
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  INITIALISE
+// ─────────────────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", async () => {
+  lucide.createIcons();
+  buildChips("s-chips", 0);
+
+  // IndexedDB を開く
+  try { idb = await openIDB(); } catch(e) { console.warn("IndexedDB 利用不可", e); }
+
+  // 旧フォーマットからの移行
+  migrateOldData();
+
+  // 曲インデックスを取得（なければ最初の曲を作成）
+  let idx = getSongIndex();
+  if (idx.length === 0) {
+    const id = genId();
+    addSongToIndex(id, "曲 1");
+    const empty = { version: 1, title: "", composer: "", markers: [], sections: [], manualDuration: 0 };
+    localStorage.setItem("song-data-" + id, JSON.stringify(empty));
+    idx = getSongIndex();
+  }
+
+  // 前回の曲を復元
+  let savedCurId = localStorage.getItem(CUR_KEY);
+  if (!idx.find(s => s.id === savedCurId)) savedCurId = idx[0].id;
+  currentSongId = savedCurId;
+  localStorage.setItem(CUR_KEY, currentSongId);
+
+  // セレクタ構築
+  rebuildSongSelect(currentSongId);
+
+  // 設定を読み込み
+  const restored = loadSongData(currentSongId);
+
+  // 音声を読み込み
+  if (!isManualMode) await loadAudio(currentSongId);
+
+  // UI 更新
+  renderSecsList();
+  renderMksList();
+  if (restored) {
+    renderAll();
+    showAutosaveBadge("saved");
+  }
 });
 
 window.addEventListener("beforeunload", () => {
+  if (currentSongId) saveSongData(currentSongId);
   if (objUrl) URL.revokeObjectURL(objUrl);
   stopManualTimer();
 });
