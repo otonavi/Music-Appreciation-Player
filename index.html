@@ -1572,6 +1572,10 @@ g("save-info-btn").addEventListener("click", () => {
   titleDisp.style.display  = S.title    ? "block" : "none";
   cmpDisp.textContent    = S.composer;
   cmpDisp.style.display    = S.composer  ? "block" : "none";
+  if (S.title) {
+    renameSongInIndex(currentSongId, S.title);
+    rebuildSongSelect(currentSongId);
+  }
   saveSettings();
   status("曲情報を更新しました。");
 });
@@ -1786,7 +1790,19 @@ function openModal(title, bodyHtml, onOk) {
   g("modal-body").innerHTML    = bodyHtml;
   modalCb = onOk;
   g("modal-bg").classList.add("open");
-  setTimeout(() => { const f = g("modal-body").querySelector("input"); if (f) f.focus(); }, 50);
+  setTimeout(() => {
+    const f = g("modal-body").querySelector("input");
+    if (f) {
+      f.focus();
+      f.addEventListener("keydown", ev => {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          if (modalCb) modalCb();
+          closeModal();
+        }
+      });
+    }
+  }, 50);
 }
 
 function closeModal() {
@@ -1992,15 +2008,31 @@ function showAutosaveBadge(state) {
   }
 }
 
+// ── 最小限スロット数（デフォルト10曲）を確保 ──
+function ensureMinimumSongs(minCount = 10) {
+  let idx = getSongIndex();
+  if (idx.length < minCount) {
+    const startNum = idx.length + 1;
+    for (let i = startNum; i <= minCount; i++) {
+      const id = genId();
+      idx.push({ id, name: `曲 ${i}` });
+      const empty = { version: 1, title: "", composer: "", markers: [], sections: [], manualDuration: 0 };
+      localStorage.setItem("song-data-" + id, JSON.stringify(empty));
+    }
+    setSongIndex(idx);
+  }
+}
+
 // ── 曲セレクタのUI更新 ──
 function rebuildSongSelect(selectedId) {
   const sel = g("song-select");
   sel.innerHTML = "";
   const idx = getSongIndex();
-  idx.forEach(s => {
+  idx.forEach((s, i) => {
     const opt = document.createElement("option");
     opt.value = s.id;
-    opt.textContent = s.name;
+    const label = /^\d+[\.．]/.test(s.name) ? s.name : `${i + 1}. ${s.name}`;
+    opt.textContent = label;
     if (s.id === selectedId) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -2053,7 +2085,7 @@ async function createNewSong(name) {
   const id = genId();
   addSongToIndex(id, name || "新しい曲");
   // 空データで初期化
-  const empty = { version: 1, title: "", composer: "", markers: [], sections: [], manualDuration: 0 };
+  const empty = { version: 1, title: name || "", composer: "", markers: [], sections: [], manualDuration: 0 };
   localStorage.setItem("song-data-" + id, JSON.stringify(empty));
   rebuildSongSelect(id);
   await switchSong(id);
@@ -2089,10 +2121,12 @@ g("song-select").addEventListener("change", async function() {
 });
 
 g("song-new-btn").addEventListener("click", () => {
+  const idx = getSongIndex();
+  const nextNum = idx.length + 1;
   openModal("新しい曲を追加", `
-    <div class="f-row"><span class="f-label">曲の名前</span><input id="new-song-name" type="text" class="f-input" placeholder="例：運命" maxlength="50"></div>
+    <div class="f-row"><span class="f-label">曲の名前</span><input id="new-song-name" type="text" class="f-input" placeholder="例：曲 ${nextNum}" maxlength="50"></div>
   `, async () => {
-    const name = (g("new-song-name").value.trim()) || "新しい曲";
+    const name = (g("new-song-name").value.trim()) || `曲 ${nextNum}`;
     await createNewSong(name);
   });
 });
@@ -2103,9 +2137,14 @@ g("song-rename-btn").addEventListener("click", () => {
   openModal("曲の名前を変更", `
     <div class="f-row"><span class="f-label">新しい名前</span><input id="rename-song-name" type="text" class="f-input" value="${esc(cur ? cur.name : "")}" maxlength="50"></div>
   `, () => {
-    const name = (g("rename-song-name").value.trim()) || "新しい曲";
+    const name = (g("rename-song-name").value.trim()) || "曲";
     renameSongInIndex(currentSongId, name);
+    S.title = name;
+    g("in-title").value = name;
+    titleDisp.textContent = name;
+    titleDisp.style.display = "block";
     rebuildSongSelect(currentSongId);
+    saveSettings();
     showAutosaveBadge("saved");
     status(`曲名を「${name}」に変更しました。`);
   });
@@ -2115,7 +2154,7 @@ g("song-delete-btn").addEventListener("click", async () => {
   const idx = getSongIndex();
   if (idx.length <= 1) { alert("最後の1曲は削除できません。"); return; }
   const cur = idx.find(s => s.id === currentSongId);
-  if (!confirm(`「${cur ? cur.name : "この曲"}」を削除します。よろしいですか？`)) return;
+  if (!confirm(`「${cur ? cur.name : "この曲"}」のデータを初期化します。よろしいですか？`)) return;
 
   const deletedId = currentSongId;
   const remaining = idx.filter(s => s.id !== deletedId);
@@ -2125,16 +2164,20 @@ g("song-delete-btn").addEventListener("click", async () => {
   deleteSongData(deletedId);
   await idbDelete("audio-" + deletedId);
 
+  // 10曲枠を常に維持
+  ensureMinimumSongs(10);
+
   rebuildSongSelect(nextId);
   await switchSong(nextId);
-  status("曲を削除しました。");
+  status("曲をリセット（削除）しました。");
 });
 
 // ── 音声クリアボタン ──
 g("audio-clear-btn").addEventListener("click", async () => {
   await idbDelete("audio-" + currentSongId);
   if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
-  audio.src = "";
+  audio.pause();
+  audio.removeAttribute("src");
   g("play-btn").disabled    = true;
   g("restart-btn").disabled = true;
   updateAudioBadge(null);
@@ -2175,15 +2218,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   // 旧フォーマットからの移行
   migrateOldData();
 
-  // 曲インデックスを取得（なければ最初の曲を作成）
+  // デフォルトで10曲分のスロットを確保（既存データはそのまま保持）
+  ensureMinimumSongs(10);
   let idx = getSongIndex();
-  if (idx.length === 0) {
-    const id = genId();
-    addSongToIndex(id, "曲 1");
-    const empty = { version: 1, title: "", composer: "", markers: [], sections: [], manualDuration: 0 };
-    localStorage.setItem("song-data-" + id, JSON.stringify(empty));
-    idx = getSongIndex();
-  }
 
   // 前回の曲を復元
   let savedCurId = localStorage.getItem(CUR_KEY);
